@@ -1,2 +1,6 @@
 fastapi
 uvicorn
+sqlalchemy
+python-telegram-bot
+google-generativeai
+python-multipart
