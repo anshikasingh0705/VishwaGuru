@@ -63,15 +63,16 @@ class TestMaharashtraLocator:
         """Test finding constituency for Mumbai pincode"""
         result = find_constituency_by_pincode("400001")
         assert result is not None
-        assert result["district"] == "Mumbai"
+        assert result["district"] == "Mumbai City"
         assert result["assembly_constituency"] == "Colaba"
     
     def test_find_mla_valid_constituency(self):
         """Test finding MLA with valid constituency"""
         result = find_mla_by_constituency("Kasba Peth")
         assert result is not None
-        assert result["mla_name"] == "Sample MLA Pune"
-        assert result["party"] == "Sample Party"
+        # Validating with real data (Ravindra Dhangekar is the current MLA as of 2024)
+        assert result["mla_name"] == "Ravindra Dhangekar"
+        assert "Indian National Congress" in result["party"]
         assert "phone" in result
         assert "email" in result
     
@@ -90,7 +91,8 @@ class TestMaharashtraLocator:
         """Test finding MLA for Colaba constituency"""
         result = find_mla_by_constituency("Colaba")
         assert result is not None
-        assert result["mla_name"] == "Sample MLA Colaba"
+        # Validating with real data (Rahul Narwekar is the current MLA as of 2024)
+        assert result["mla_name"] == "Rahul Narwekar"
     
     def test_full_lookup_flow(self):
         """Test complete lookup flow from pincode to MLA"""
@@ -100,7 +102,7 @@ class TestMaharashtraLocator:
         
         mla = find_mla_by_constituency(constituency["assembly_constituency"])
         assert mla is not None
-        assert mla["mla_name"] == "Sample MLA Pune"
+        assert mla["mla_name"] == "Ravindra Dhangekar"
         
         # Test Mumbai pincode
         constituency = find_constituency_by_pincode("400001")
@@ -108,7 +110,7 @@ class TestMaharashtraLocator:
         
         mla = find_mla_by_constituency(constituency["assembly_constituency"])
         assert mla is not None
-        assert mla["mla_name"] == "Sample MLA Colaba"
+        assert mla["mla_name"] == "Rahul Narwekar"
 
 
 if __name__ == "__main__":
