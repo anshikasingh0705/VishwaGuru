@@ -1,10 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from database import engine, get_db
 from models import Base, Issue
 from ai_service import generate_action_plan
+from maharashtra_locator import find_constituency_by_pincode, find_mla_by_constituency
+from gemini_summary import generate_mla_summary
 import json
 import os
 import shutil
@@ -125,6 +127,79 @@ def get_responsibility_map():
         return _load_responsibility_map()
     except FileNotFoundError:
         return {"error": "Data file not found"}
+
+@app.get("/api/mh/rep-contacts")
+async def get_maharashtra_rep_contacts(pincode: str = Query(..., min_length=6, max_length=6)):
+    """
+    Get MLA and representative contact information for Maharashtra by pincode.
+    
+    Args:
+        pincode: 6-digit pincode for Maharashtra
+        
+    Returns:
+        JSON with MLA details, constituency info, and grievance portal links
+    """
+    # Validate pincode format
+    if not pincode.isdigit():
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid pincode format. Must be 6 digits."
+        )
+    
+    # Find constituency by pincode
+    constituency_info = find_constituency_by_pincode(pincode)
+    
+    if not constituency_info:
+        raise HTTPException(
+            status_code=404,
+            detail="Unknown pincode for Maharashtra MVP. Currently only supporting limited pincodes."
+        )
+    
+    # Find MLA by constituency
+    mla_info = find_mla_by_constituency(constituency_info["assembly_constituency"])
+    
+    if not mla_info:
+        raise HTTPException(
+            status_code=404,
+            detail=f"MLA information not found for constituency: {constituency_info['assembly_constituency']}"
+        )
+    
+    # Generate AI summary (optional)
+    description = None
+    try:
+        description = await generate_mla_summary(
+            district=constituency_info["district"],
+            assembly_constituency=constituency_info["assembly_constituency"],
+            mla_name=mla_info["mla_name"]
+        )
+    except Exception as e:
+        print(f"Error generating MLA summary: {e}")
+        # Continue without description
+    
+    # Build response
+    response = {
+        "pincode": pincode,
+        "state": constituency_info["state"],
+        "district": constituency_info["district"],
+        "assembly_constituency": constituency_info["assembly_constituency"],
+        "mla": {
+            "name": mla_info["mla_name"],
+            "party": mla_info["party"],
+            "phone": mla_info["phone"],
+            "email": mla_info["email"]
+        },
+        "grievance_links": {
+            "central_cpgrams": "https://pgportal.gov.in/",
+            "maharashtra_portal": "https://aaplesarkar.mahaonline.gov.in/en",
+            "note": "This is an MVP; data may not be fully accurate."
+        }
+    }
+    
+    # Add description if generated
+    if description:
+        response["description"] = description
+    
+    return response
 
 # Note: Frontend serving code removed for separate deployment
 # The frontend will be deployed on Netlify and make API calls to this backend

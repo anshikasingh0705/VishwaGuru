@@ -1,0 +1,42 @@
+[
+  {
+    "state": "Maharashtra",
+    "assembly_constituency": "Kasba Peth",
+    "mla_name": "Sample MLA Pune",
+    "party": "Sample Party",
+    "phone": "98XXXXXXXX",
+    "email": "pune.mla@example.com"
+  },
+  {
+    "state": "Maharashtra",
+    "assembly_constituency": "Colaba",
+    "mla_name": "Sample MLA Colaba",
+    "party": "Sample Party",
+    "phone": "98YYYYYYYY",
+    "email": "colaba.mla@example.com"
+  },
+  {
+    "state": "Maharashtra",
+    "assembly_constituency": "Shivajinagar",
+    "mla_name": "Sample MLA Shivajinagar",
+    "party": "Sample Party",
+    "phone": "98ZZZZZZZZ",
+    "email": "shivajinagar.mla@example.com"
+  },
+  {
+    "state": "Maharashtra",
+    "assembly_constituency": "Mumbadevi",
+    "mla_name": "Sample MLA Mumbadevi",
+    "party": "Sample Party",
+    "phone": "98AAAAAAAA",
+    "email": "mumbadevi.mla@example.com"
+  },
+  {
+    "state": "Maharashtra",
+    "assembly_constituency": "Nagpur Central",
+    "mla_name": "Sample MLA Nagpur",
+    "party": "Sample Party",
+    "phone": "98BBBBBBBB",
+    "email": "nagpur.mla@example.com"
+  }
+]
