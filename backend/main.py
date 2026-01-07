@@ -91,6 +91,69 @@ def validate_uploaded_file(file: UploadFile) -> None:
             detail="Unable to validate file content. Please ensure it's a valid image file."
         )
 
+def validate_image_for_processing(image: Image.Image, max_width: int = 4096, max_height: int = 4096) -> None:
+    """
+    Validate PIL Image object for processing safety.
+    
+    Args:
+        image: PIL Image object to validate
+        max_width: Maximum allowed width in pixels
+        max_height: Maximum allowed height in pixels
+        
+    Raises:
+        HTTPException: If image validation fails
+    """
+    try:
+        # Verify image integrity (checks for corruption)
+        image.verify()
+        
+        # Re-open image after verify() closes it
+        image.seek(0)
+        if hasattr(image, 'load'):
+            image.load()
+            
+    except Exception as e:
+        logger.error(f"Image verification failed: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Image file appears to be corrupted or invalid. Please upload a valid image."
+        )
+    
+    # Check image dimensions
+    width, height = image.size
+    if width > max_width or height > max_height:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image dimensions too large. Maximum allowed: {max_width}x{max_height} pixels. Uploaded: {width}x{height} pixels."
+        )
+    
+    # Check for extremely small images that might cause issues
+    if width < 10 or height < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Image dimensions too small. Minimum allowed: 10x10 pixels."
+        )
+    
+    # Check image mode (ensure it's RGB or compatible)
+    if image.mode not in ['RGB', 'RGBA', 'L', 'P']:
+        try:
+            # Convert to RGB if possible
+            if image.mode in ['RGBA', 'LA', 'P']:
+                image.convert('RGB')
+            elif image.mode == 'L':
+                pass  # Grayscale is acceptable
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unsupported image mode: {image.mode}. Please upload RGB, RGBA, or grayscale images."
+                )
+        except Exception as e:
+            logger.error(f"Image mode conversion failed: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail="Unable to process image format. Please try a different image."
+            )
+
 # Simple in-memory cache
 RECENT_ISSUES_CACHE = {
     "data": None,
@@ -377,6 +440,10 @@ async def detect_pothole_endpoint(image: UploadFile = File(...)):
     # Convert to PIL Image directly from file object to save memory
     try:
         pil_image = await run_in_threadpool(Image.open, image.file)
+        # Validate image for processing
+        validate_image_for_processing(pil_image)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions from validation
     except Exception as e:
         logger.error(f"Invalid image file for pothole detection: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid image file")
@@ -397,6 +464,10 @@ async def detect_infrastructure_endpoint(image: UploadFile = File(...)):
     # Convert to PIL Image directly from file object to save memory
     try:
         pil_image = await run_in_threadpool(Image.open, image.file)
+        # Validate image for processing
+        validate_image_for_processing(pil_image)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions from validation
     except Exception as e:
         logger.error(f"Invalid image file for infrastructure detection: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid image file")
@@ -417,6 +488,10 @@ async def detect_flooding_endpoint(image: UploadFile = File(...)):
     # Convert to PIL Image directly from file object to save memory
     try:
         pil_image = await run_in_threadpool(Image.open, image.file)
+        # Validate image for processing
+        validate_image_for_processing(pil_image)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions from validation
     except Exception as e:
         logger.error(f"Invalid image file for flooding detection: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid image file")
@@ -437,6 +512,10 @@ async def detect_vandalism_endpoint(image: UploadFile = File(...)):
     # Convert to PIL Image directly from file object to save memory
     try:
         pil_image = await run_in_threadpool(Image.open, image.file)
+        # Validate image for processing
+        validate_image_for_processing(pil_image)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions from validation
     except Exception as e:
         logger.error(f"Invalid image file for vandalism detection: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid image file")
@@ -457,6 +536,10 @@ async def detect_garbage_endpoint(image: UploadFile = File(...)):
     # Convert to PIL Image directly from file object to save memory
     try:
         pil_image = await run_in_threadpool(Image.open, image.file)
+        # Validate image for processing
+        validate_image_for_processing(pil_image)
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions from validation
     except Exception as e:
         logger.error(f"Invalid image file for garbage detection: {e}", exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid image file")
