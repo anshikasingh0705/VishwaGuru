@@ -8,6 +8,7 @@ Hugging Face API.
 import logging
 from PIL import Image
 import threading
+from fastapi.concurrency import run_in_threadpool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 # Model cache for lazy loading
 _general_model = None
 _model_lock = threading.Lock()
+
+# Confidence scaling factors
+HEURISTIC_CONFIDENCE_FACTOR = 0.6  # Reduce confidence for heuristic detection
+LOW_CONFIDENCE_FACTOR = 0.5  # Lower confidence for uncertain detections
 
 
 def load_general_model():
@@ -89,14 +94,11 @@ async def detect_vandalism_local(image: Image.Image, client=None):
             logger.warning("Detection model not available, returning empty detections.")
             return []
         
-        # Convert PIL Image to format suitable for YOLO
-        results = model.predict(image, stream=False)
+        # Run model prediction in threadpool to avoid blocking event loop
+        results = await run_in_threadpool(model.predict, image, stream=False)
         result = results[0]
         
         detections = []
-        
-        # Define object classes that might indicate vandalism or damage
-        vandalism_related = ['graffiti', 'person', 'car', 'truck', 'bottle', 'umbrella']
         
         if hasattr(result, 'boxes'):
             for box in result.boxes:
@@ -115,7 +117,7 @@ async def detect_vandalism_local(image: Image.Image, client=None):
                     
                     detections.append({
                         "label": vandalism_label,
-                        "confidence": conf * 0.6,  # Reduce confidence for heuristic detection
+                        "confidence": conf * HEURISTIC_CONFIDENCE_FACTOR,
                         "box": coords
                     })
         
@@ -150,7 +152,8 @@ async def detect_infrastructure_local(image: Image.Image, client=None):
             logger.warning("Detection model not available, returning empty detections.")
             return []
         
-        results = model.predict(image, stream=False)
+        # Run model prediction in threadpool to avoid blocking event loop
+        results = await run_in_threadpool(model.predict, image, stream=False)
         result = results[0]
         
         detections = []
@@ -176,7 +179,7 @@ async def detect_infrastructure_local(image: Image.Image, client=None):
                     
                     detections.append({
                         "label": infra_label,
-                        "confidence": conf * 0.6,  # Reduce confidence for heuristic detection
+                        "confidence": conf * HEURISTIC_CONFIDENCE_FACTOR,
                         "box": coords
                     })
         
@@ -208,7 +211,8 @@ async def detect_flooding_local(image: Image.Image, client=None):
             logger.warning("Detection model not available, returning empty detections.")
             return []
         
-        results = model.predict(image, stream=False)
+        # Run model prediction in threadpool to avoid blocking event loop
+        results = await run_in_threadpool(model.predict, image, stream=False)
         result = results[0]
         
         detections = []
@@ -233,7 +237,7 @@ async def detect_flooding_local(image: Image.Image, client=None):
                     if box_bottom > image_height * 0.6:
                         detections.append({
                             "label": "potential flooding",
-                            "confidence": conf * 0.5,  # Lower confidence for heuristic
+                            "confidence": conf * LOW_CONFIDENCE_FACTOR,
                             "box": coords
                         })
         
