@@ -3,6 +3,7 @@ import io
 import httpx
 from PIL import Image
 import asyncio
+from typing import Union
 
 # HF_TOKEN is optional for public models but recommended for higher limits
 token = os.environ.get("HF_TOKEN")
@@ -40,16 +41,28 @@ async def _make_request(client, image_bytes, labels):
         print(f"HF API Request Exception: {e}")
         return []
 
-async def detect_vandalism_clip(image: Image.Image, client: httpx.AsyncClient = None):
+def _prepare_image_bytes(image: Union[Image.Image, bytes]) -> bytes:
+    """
+    Helper to get bytes from PIL Image or return bytes as is.
+    Avoids unnecessary re-encoding if bytes are already available.
+    """
+    if isinstance(image, bytes):
+        return image
+
+    img_byte_arr = io.BytesIO()
+    # If image.format is not available (e.g. newly created image), default to JPEG
+    fmt = image.format if image.format else 'JPEG'
+    image.save(img_byte_arr, format=fmt)
+    return img_byte_arr.getvalue()
+
+async def detect_vandalism_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     """
     Detects vandalism/graffiti using Zero-Shot Image Classification with CLIP (Async).
     """
     try:
         labels = ["graffiti", "vandalism", "spray paint", "street art", "clean wall", "public property", "normal street"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -72,13 +85,11 @@ async def detect_vandalism_clip(image: Image.Image, client: httpx.AsyncClient = 
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_infrastructure_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_infrastructure_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["broken streetlight", "damaged traffic sign", "fallen tree", "damaged fence", "pothole", "clean street", "normal infrastructure"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -100,13 +111,11 @@ async def detect_infrastructure_clip(image: Image.Image, client: httpx.AsyncClie
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_flooding_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_flooding_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["flooded street", "waterlogging", "blocked drain", "heavy rain", "dry street", "normal road"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -128,13 +137,11 @@ async def detect_flooding_clip(image: Image.Image, client: httpx.AsyncClient = N
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_illegal_parking_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_illegal_parking_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["illegally parked car", "car blocking driveway", "car on sidewalk", "double parking", "parked car", "empty street", "traffic jam"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -156,13 +163,11 @@ async def detect_illegal_parking_clip(image: Image.Image, client: httpx.AsyncCli
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_street_light_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_street_light_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["broken streetlight", "dark street", "street light off", "working streetlight", "daytime street"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -184,13 +189,11 @@ async def detect_street_light_clip(image: Image.Image, client: httpx.AsyncClient
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_fire_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_fire_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["fire", "smoke", "flames", "forest fire", "building fire", "normal street", "clear sky"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -212,13 +215,11 @@ async def detect_fire_clip(image: Image.Image, client: httpx.AsyncClient = None)
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_stray_animal_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_stray_animal_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["stray dog", "stray cow", "stray cattle", "wild animal", "pet dog", "empty street"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
@@ -240,13 +241,11 @@ async def detect_stray_animal_clip(image: Image.Image, client: httpx.AsyncClient
         print(f"HF Detection Error: {e}")
         return []
 
-async def detect_blocked_road_clip(image: Image.Image, client: httpx.AsyncClient = None):
+async def detect_blocked_road_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:
         labels = ["fallen tree", "construction work", "road barrier", "traffic accident", "landslide", "clear road", "normal traffic"]
 
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
-        img_bytes = img_byte_arr.getvalue()
+        img_bytes = _prepare_image_bytes(image)
 
         results = await query_hf_api(img_bytes, labels, client=client)
 
