@@ -25,7 +25,16 @@ from contextlib import asynccontextmanager
 from bot import run_bot
 from pothole_detection import detect_potholes
 from garbage_detection import detect_garbage
-from hf_service import detect_vandalism_clip, detect_flooding_clip, detect_infrastructure_clip
+from hf_service import (
+    detect_vandalism_clip,
+    detect_flooding_clip,
+    detect_infrastructure_clip,
+    detect_illegal_parking_clip,
+    detect_street_light_clip,
+    detect_fire_clip,
+    detect_stray_animal_clip,
+    detect_blocked_road_clip
+)
 from PIL import Image
 from init_db import migrate_db
 import logging
@@ -390,6 +399,87 @@ async def detect_garbage_endpoint(image: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Garbage detection error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-illegal-parking")
+async def detect_illegal_parking_endpoint(request: Request, image: UploadFile = File(...)):
+    try:
+        pil_image = await run_in_threadpool(Image.open, image.file)
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        detections = await detect_illegal_parking_clip(pil_image, client=client)
+        return {"detections": detections}
+    except Exception as e:
+        logger.error(f"Illegal parking detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-street-light")
+async def detect_street_light_endpoint(request: Request, image: UploadFile = File(...)):
+    try:
+        pil_image = await run_in_threadpool(Image.open, image.file)
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        detections = await detect_street_light_clip(pil_image, client=client)
+        return {"detections": detections}
+    except Exception as e:
+        logger.error(f"Street light detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-fire")
+async def detect_fire_endpoint(request: Request, image: UploadFile = File(...)):
+    try:
+        pil_image = await run_in_threadpool(Image.open, image.file)
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        detections = await detect_fire_clip(pil_image, client=client)
+        return {"detections": detections}
+    except Exception as e:
+        logger.error(f"Fire detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-stray-animal")
+async def detect_stray_animal_endpoint(request: Request, image: UploadFile = File(...)):
+    try:
+        pil_image = await run_in_threadpool(Image.open, image.file)
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        detections = await detect_stray_animal_clip(pil_image, client=client)
+        return {"detections": detections}
+    except Exception as e:
+        logger.error(f"Stray animal detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/api/detect-blocked-road")
+async def detect_blocked_road_endpoint(request: Request, image: UploadFile = File(...)):
+    try:
+        pil_image = await run_in_threadpool(Image.open, image.file)
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        detections = await detect_blocked_road_clip(pil_image, client=client)
+        return {"detections": detections}
+    except Exception as e:
+        logger.error(f"Blocked road detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app.get("/api/mh/rep-contacts")
 async def get_maharashtra_rep_contacts(pincode: str = Query(..., min_length=6, max_length=6)):

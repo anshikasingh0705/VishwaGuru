@@ -1,0 +1,17 @@
+
+> frontend@0.0.0 dev
+> vite
+
+
+  VITE v7.3.0  ready in 364 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+9:45:17 AM [vite] http proxy error: /api/issues/recent
+AggregateError [ECONNREFUSED]:
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)
+9:45:17 AM [vite] http proxy error: /api/issues/recent
+AggregateError [ECONNREFUSED]:
+    at internalConnectMultiple (node:net:1134:18)
+    at afterConnectMultiple (node:net:1715:7)

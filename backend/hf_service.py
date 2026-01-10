@@ -127,3 +127,143 @@ async def detect_flooding_clip(image: Image.Image, client: httpx.AsyncClient = N
     except Exception as e:
         print(f"HF Detection Error: {e}")
         return []
+
+async def detect_illegal_parking_clip(image: Image.Image, client: httpx.AsyncClient = None):
+    try:
+        labels = ["illegally parked car", "car blocking driveway", "car on sidewalk", "double parking", "parked car", "empty street", "traffic jam"]
+
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+             return []
+
+        parking_labels = ["illegally parked car", "car blocking driveway", "car on sidewalk", "double parking"]
+        detected = []
+
+        for res in results:
+            if isinstance(res, dict) and res.get('label') in parking_labels and res.get('score', 0) > 0.4:
+                 detected.append({
+                     "label": res['label'],
+                     "confidence": res['score'],
+                     "box": []
+                 })
+        return detected
+    except Exception as e:
+        print(f"HF Detection Error: {e}")
+        return []
+
+async def detect_street_light_clip(image: Image.Image, client: httpx.AsyncClient = None):
+    try:
+        labels = ["broken streetlight", "dark street", "street light off", "working streetlight", "daytime street"]
+
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+             return []
+
+        light_labels = ["broken streetlight", "dark street", "street light off"]
+        detected = []
+
+        for res in results:
+            if isinstance(res, dict) and res.get('label') in light_labels and res.get('score', 0) > 0.4:
+                 detected.append({
+                     "label": res['label'],
+                     "confidence": res['score'],
+                     "box": []
+                 })
+        return detected
+    except Exception as e:
+        print(f"HF Detection Error: {e}")
+        return []
+
+async def detect_fire_clip(image: Image.Image, client: httpx.AsyncClient = None):
+    try:
+        labels = ["fire", "smoke", "flames", "forest fire", "building fire", "normal street", "clear sky"]
+
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+             return []
+
+        fire_labels = ["fire", "smoke", "flames", "forest fire", "building fire"]
+        detected = []
+
+        for res in results:
+            if isinstance(res, dict) and res.get('label') in fire_labels and res.get('score', 0) > 0.4:
+                 detected.append({
+                     "label": res['label'],
+                     "confidence": res['score'],
+                     "box": []
+                 })
+        return detected
+    except Exception as e:
+        print(f"HF Detection Error: {e}")
+        return []
+
+async def detect_stray_animal_clip(image: Image.Image, client: httpx.AsyncClient = None):
+    try:
+        labels = ["stray dog", "stray cow", "stray cattle", "wild animal", "pet dog", "empty street"]
+
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+             return []
+
+        animal_labels = ["stray dog", "stray cow", "stray cattle", "wild animal"]
+        detected = []
+
+        for res in results:
+            if isinstance(res, dict) and res.get('label') in animal_labels and res.get('score', 0) > 0.4:
+                 detected.append({
+                     "label": res['label'],
+                     "confidence": res['score'],
+                     "box": []
+                 })
+        return detected
+    except Exception as e:
+        print(f"HF Detection Error: {e}")
+        return []
+
+async def detect_blocked_road_clip(image: Image.Image, client: httpx.AsyncClient = None):
+    try:
+        labels = ["fallen tree", "construction work", "road barrier", "traffic accident", "landslide", "clear road", "normal traffic"]
+
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format=image.format if image.format else 'JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+             return []
+
+        block_labels = ["fallen tree", "construction work", "road barrier", "traffic accident", "landslide"]
+        detected = []
+
+        for res in results:
+            if isinstance(res, dict) and res.get('label') in block_labels and res.get('score', 0) > 0.4:
+                 detected.append({
+                     "label": res['label'],
+                     "confidence": res['score'],
+                     "box": []
+                 })
+        return detected
+    except Exception as e:
+        print(f"HF Detection Error: {e}")
+        return []

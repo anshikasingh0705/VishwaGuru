@@ -16,6 +16,11 @@ const GarbageDetector = React.lazy(() => import('./GarbageDetector'));
 const VandalismDetector = React.lazy(() => import('./VandalismDetector'));
 const FloodDetector = React.lazy(() => import('./FloodDetector'));
 const InfrastructureDetector = React.lazy(() => import('./InfrastructureDetector'));
+const IllegalParkingDetector = React.lazy(() => import('./IllegalParkingDetector'));
+const StreetLightDetector = React.lazy(() => import('./StreetLightDetector'));
+const FireDetector = React.lazy(() => import('./FireDetector'));
+const StrayAnimalDetector = React.lazy(() => import('./StrayAnimalDetector'));
+const BlockedRoadDetector = React.lazy(() => import('./BlockedRoadDetector'));
 
 // Get API URL from environment variable, fallback to relative URL for local dev
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -32,7 +37,7 @@ function AppContent() {
 
   // Safe navigation helper
   const navigateToView = (view) => {
-    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure'];
+    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure', 'parking', 'streetlight', 'fire', 'animal', 'blocked'];
     if (validViews.includes(view)) {
       navigate(view === 'home' ? '/' : `/${view}`);
     }
@@ -201,6 +206,11 @@ function AppContent() {
               path="/infrastructure"
               element={<InfrastructureDetector onBack={() => navigate('/')} />}
             />
+            <Route path="/parking" element={<IllegalParkingDetector onBack={() => navigate('/')} />} />
+            <Route path="/streetlight" element={<StreetLightDetector onBack={() => navigate('/')} />} />
+            <Route path="/fire" element={<FireDetector onBack={() => navigate('/')} />} />
+            <Route path="/animal" element={<StrayAnimalDetector onBack={() => navigate('/')} />} />
+            <Route path="/blocked" element={<BlockedRoadDetector onBack={() => navigate('/')} />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
