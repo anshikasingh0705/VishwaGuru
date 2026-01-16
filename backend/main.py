@@ -26,21 +26,7 @@ from contextlib import asynccontextmanager
 from bot import run_bot
 from pothole_detection import detect_potholes
 from garbage_detection import detect_garbage
-from unified_detection_service import detect_vandalism, detect_flooding, detect_infrastructure, get_detection_status
-from hf_service import (
-    detect_vandalism_clip,
-    detect_flooding_clip,
-    detect_infrastructure_clip,
-    detect_illegal_parking_clip,
-    detect_street_light_clip,
-    detect_fire_clip,
-    detect_stray_animal_clip,
-    detect_blocked_road_clip,
-    detect_tree_hazard_clip,
-    detect_pest_clip,
-    detect_severity_clip,
-    generate_image_caption
-)
+from local_ml_service import detect_vandalism_local, detect_flooding_local, detect_infrastructure_local
 from PIL import Image
 from init_db import migrate_db
 import logging
@@ -386,7 +372,7 @@ async def detect_infrastructure_endpoint(request: Request, image: UploadFile = F
     try:
         # Use shared HTTP client from app state
         client = request.app.state.http_client
-        detections = await detect_infrastructure_clip(image_bytes, client=client)
+        detections = await detect_infrastructure_local(pil_image, client=client)
         return {"detections": detections}
     except Exception as e:
         logger.error(f"Infrastructure detection error: {e}", exc_info=True)
@@ -405,7 +391,7 @@ async def detect_flooding_endpoint(request: Request, image: UploadFile = File(..
     try:
         # Use shared HTTP client from app state
         client = request.app.state.http_client
-        detections = await detect_flooding_clip(image_bytes, client=client)
+        detections = await detect_flooding_local(pil_image, client=client)
         return {"detections": detections}
     except Exception as e:
         logger.error(f"Flooding detection error: {e}", exc_info=True)
@@ -424,7 +410,7 @@ async def detect_vandalism_endpoint(request: Request, image: UploadFile = File(.
     try:
         # Use shared HTTP client from app state
         client = request.app.state.http_client
-        detections = await detect_vandalism_clip(image_bytes, client=client)
+        detections = await detect_vandalism_local(pil_image, client=client)
         return {"detections": detections}
     except Exception as e:
         logger.error(f"Vandalism detection error: {e}", exc_info=True)

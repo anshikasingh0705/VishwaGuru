@@ -1,3 +1,9 @@
+"""
+DEPRECATED: This module is no longer used.
+Please use local_ml_service.py for local ML model-based detection instead of Hugging Face API.
+
+This file is kept for reference purposes only.
+"""
 import os
 import io
 import httpx
