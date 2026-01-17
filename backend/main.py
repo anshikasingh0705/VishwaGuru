@@ -66,7 +66,8 @@ from backend.hf_service import (
     detect_tree_hazard_clip,
     detect_pest_clip,
     detect_severity_clip,
-    generate_image_caption
+    generate_image_caption,
+    detect_smart_scan_clip
 )
 
 
@@ -267,10 +268,32 @@ async def create_issue(
         )
 
         # Offload blocking DB operations to threadpool
-        await run_in_threadpool(save_issue_db, db, new_issue)
+        saved_issue = await run_in_threadpool(save_issue_db, db, new_issue)
 
-        # Invalidate cache
-        recent_issues_cache.invalidate()
+        # Optimistically update cache to avoid DB query on next homepage load
+        cached_data = recent_issues_cache.get()
+        if cached_data is not None:
+            # Format the new issue to match IssueResponse structure
+            new_issue_dict = IssueResponse(
+                id=saved_issue.id,
+                category=saved_issue.category,
+                description=saved_issue.description[:100] + "..." if len(saved_issue.description) > 100 else saved_issue.description,
+                created_at=saved_issue.created_at,
+                image_path=saved_issue.image_path,
+                status=saved_issue.status,
+                upvotes=saved_issue.upvotes if saved_issue.upvotes is not None else 0,
+                location=saved_issue.location,
+                latitude=saved_issue.latitude,
+                longitude=saved_issue.longitude,
+                action_plan=action_plan_data
+            ).model_dump(mode='json')
+
+            # Prepend to cache and keep top 10
+            updated_cache = [new_issue_dict] + cached_data
+            recent_issues_cache.set(updated_cache[:10])
+        else:
+            # Invalidate cache if it was empty/expired, so next fetch repopulates it
+            recent_issues_cache.invalidate()
 
         return IssueCreateResponse(
             id=new_issue.id,
@@ -404,7 +427,7 @@ async def detect_infrastructure_endpoint(request: Request, image: UploadFile = F
     try:
         # Use shared HTTP client from app state
         client = request.app.state.http_client
-        detections = await detect_infrastructure_clip(image_bytes, client=client)
+        detections = await detect_infrastructure_local(pil_image, client=client)
         return {"detections": detections}
     except Exception as e:
         logger.error(f"Infrastructure detection error: {e}", exc_info=True)
@@ -423,7 +446,7 @@ async def detect_flooding_endpoint(request: Request, image: UploadFile = File(..
     try:
         # Use shared HTTP client from app state
         client = request.app.state.http_client
-        detections = await detect_flooding_clip(image_bytes, client=client)
+        detections = await detect_flooding_local(pil_image, client=client)
         return {"detections": detections}
     except Exception as e:
         logger.error(f"Flooding detection error: {e}", exc_info=True)
@@ -442,7 +465,7 @@ async def detect_vandalism_endpoint(request: Request, image: UploadFile = File(.
     try:
         # Use shared HTTP client from app state
         client = request.app.state.http_client
-        detections = await detect_vandalism_clip(image_bytes, client=client)
+        detections = await detect_vandalism_local(pil_image, client=client)
         return {"detections": detections}
     except Exception as e:
         logger.error(f"Vandalism detection error: {e}", exc_info=True)
@@ -594,6 +617,23 @@ async def detect_severity_endpoint(request: Request, image: UploadFile = File(..
         return result
     except Exception as e:
         logger.error(f"Severity detection error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/api/detect-smart-scan")
+async def detect_smart_scan_endpoint(request: Request, image: UploadFile = File(...)):
+    try:
+        image_bytes = await image.read()
+    except Exception as e:
+        logger.error(f"Invalid image file: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    try:
+        client = request.app.state.http_client
+        result = await detect_smart_scan_clip(image_bytes, client=client)
+        return result
+    except Exception as e:
+        logger.error(f"Smart scan detection error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

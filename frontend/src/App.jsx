@@ -25,6 +25,7 @@ const StrayAnimalDetector = React.lazy(() => import('./StrayAnimalDetector'));
 const BlockedRoadDetector = React.lazy(() => import('./BlockedRoadDetector'));
 const TreeDetector = React.lazy(() => import('./TreeDetector'));
 const PestDetector = React.lazy(() => import('./PestDetector'));
+const SmartScanner = React.lazy(() => import('./SmartScanner'));
 
 // Create a wrapper component to handle state management
 function AppContent() {
@@ -38,7 +39,7 @@ function AppContent() {
 
   // Safe navigation helper
   const navigateToView = (view) => {
-    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure', 'parking', 'streetlight', 'fire', 'animal', 'blocked', 'tree', 'pest'];
+    const validViews = ['home', 'map', 'report', 'action', 'mh-rep', 'pothole', 'garbage', 'vandalism', 'flood', 'infrastructure', 'parking', 'streetlight', 'fire', 'animal', 'blocked', 'tree', 'pest', 'smart-scan'];
     if (validViews.includes(view)) {
       navigate(view === 'home' ? '/' : `/${view}`);
     }
@@ -208,6 +209,7 @@ function AppContent() {
             <Route path="/blocked" element={<BlockedRoadDetector onBack={() => navigate('/')} />} />
             <Route path="/tree" element={<TreeDetector onBack={() => navigate('/')} />} />
             <Route path="/pest" element={<PestDetector onBack={() => navigate('/')} />} />
+            <Route path="/smart-scan" element={<SmartScanner onBack={() => navigate('/')} />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

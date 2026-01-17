@@ -1,8 +1,40 @@
 import React from 'react';
-import { AlertTriangle, MapPin, Search, Activity, Camera, Trash2, ThumbsUp, Brush, Droplets, Zap, Truck, Flame, Dog, XCircle, Lightbulb, TreeDeciduous, Bug } from 'lucide-react';
+import { AlertTriangle, MapPin, Search, Activity, Camera, Trash2, ThumbsUp, Brush, Droplets, Zap, Truck, Flame, Dog, XCircle, Lightbulb, TreeDeciduous, Bug, Scan, ChevronRight } from 'lucide-react';
 
-const Home = ({ setView, fetchResponsibilityMap, recentIssues, handleUpvote }) => (
+const Home = ({ setView, fetchResponsibilityMap, recentIssues, handleUpvote }) => {
+  const totalImpact = 1240 + (recentIssues ? recentIssues.length : 0);
+
+  return (
   <div className="space-y-6">
+    {/* Impact Widget */}
+    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-4 text-white shadow-md flex justify-between items-center">
+        <div>
+            <h2 className="text-lg font-bold">Community Impact</h2>
+            <p className="text-indigo-100 text-sm">Together we are making a change!</p>
+        </div>
+        <div className="text-right">
+            <span className="text-3xl font-bold block">{totalImpact}</span>
+            <span className="text-xs text-indigo-200 uppercase tracking-wider">Issues Solved</span>
+        </div>
+    </div>
+
+    {/* Smart Scanner CTA */}
+    <button
+        onClick={() => setView('smart-scan')}
+        className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 p-4 rounded-xl shadow-md flex items-center justify-between text-white hover:opacity-90 transition transform active:scale-98"
+    >
+        <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+               <Scan size={24} />
+            </div>
+            <div className="text-left">
+                <h3 className="font-bold text-lg">Smart City Scanner</h3>
+                <p className="text-blue-100 text-sm">AI-powered instant detection</p>
+            </div>
+        </div>
+        <ChevronRight size={24} />
+    </button>
+
     {/* Quick Actions Grid */}
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
       <button
@@ -197,6 +229,7 @@ const Home = ({ setView, fetchResponsibilityMap, recentIssues, handleUpvote }) =
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default Home;

@@ -1,3 +1,9 @@
+"""
+DEPRECATED: This module is no longer used.
+Please use local_ml_service.py for local ML model-based detection instead of Hugging Face API.
+
+This file is kept for reference purposes only.
+"""
 import os
 import io
 import httpx
@@ -123,6 +129,52 @@ async def detect_vandalism_clip(image: Union[Image.Image, bytes], client: httpx.
     except Exception as e:
         logger.error(f"HF Detection Error: {e}")
         return []
+
+async def detect_smart_scan_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    try:
+        labels = [
+            "pothole",
+            "garbage pile",
+            "graffiti",
+            "broken streetlight",
+            "illegal parking",
+            "fallen tree",
+            "stray animal",
+            "fire",
+            "flooded street",
+            "safe street",
+            "clean road"
+        ]
+
+        img_bytes = _prepare_image_bytes(image)
+
+        results = await query_hf_api(img_bytes, labels, client=client)
+
+        if not isinstance(results, list):
+            return {"label": "unknown", "score": 0}
+
+        # Sort by score descending
+        results.sort(key=lambda x: x.get('score', 0), reverse=True)
+
+        top_result = results[0] if results else {"label": "unknown", "score": 0}
+
+        safe_labels = ["safe street", "clean road"]
+        label = top_result['label']
+
+        # If confidence is low, default to uncertain
+        if top_result.get('score', 0) < 0.2:
+             return {"label": "uncertain", "score": top_result.get('score', 0)}
+
+        if label in safe_labels:
+             return {"label": "Safe", "score": top_result['score']}
+
+        return {
+            "label": label,
+            "score": top_result['score']
+        }
+    except Exception as e:
+        logger.error(f"HF Smart Scan Error: {e}")
+        return {"label": "Error", "error": str(e)}
 
 async def detect_severity_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     try:

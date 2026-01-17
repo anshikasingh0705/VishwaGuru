@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { fakeActionPlan } from '../fakeData';
 import { Camera, Image as ImageIcon } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 // Get API URL from environment variable, fallback to relative URL for local dev
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) => {
+  const locationState = useLocation().state || {};
   const [formData, setFormData] = useState({
-    description: '',
-    category: 'road',
+    description: locationState.description || '',
+    category: locationState.category || 'road',
     image: null,
     latitude: null,
     longitude: null,
