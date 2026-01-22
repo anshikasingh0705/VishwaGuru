@@ -16,54 +16,6 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="google.generat
 
 logger = logging.getLogger(__name__)
 
-async def retry_with_exponential_backoff(
-    func: Callable,
-    max_retries: int = 3,
-    base_delay: float = 1.0,
-    max_delay: float = 60.0,
-    backoff_factor: float = 2.0,
-    *args,
-    **kwargs
-) -> Any:
-    """
-    Retry an async function with exponential backoff.
-
-    Args:
-        func: The async function to retry
-        max_retries: Maximum number of retry attempts
-        base_delay: Initial delay in seconds
-        max_delay: Maximum delay between retries
-        backoff_factor: Factor to multiply delay by each retry
-        *args, **kwargs: Arguments to pass to the function
-
-    Returns:
-        The result of the function call
-
-    Raises:
-        The last exception encountered if all retries fail
-    """
-    last_exception = None
-
-    for attempt in range(max_retries + 1):
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            last_exception = e
-
-            if attempt == max_retries:
-                # Last attempt failed, re-raise the exception
-                logger.error(f"Function {func.__name__} failed after {max_retries + 1} attempts: {e}")
-                raise e
-
-            # Calculate delay with exponential backoff
-            delay = min(base_delay * (backoff_factor ** attempt), max_delay)
-
-            logger.warning(f"Function {func.__name__} failed (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying in {delay:.1f}s")
-            await asyncio.sleep(delay)
-
-    # This should never be reached, but just in case
-    raise last_exception
-
 # Configure Gemini (mandatory environment variable)
 api_key = os.environ.get("GEMINI_API_KEY")
 
