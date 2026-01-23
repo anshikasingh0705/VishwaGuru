@@ -90,17 +90,19 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4">
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans">
       <ChatWidget />
-      <div className="bg-white shadow-xl rounded-2xl p-6 max-w-lg w-full mt-6 mb-24 border border-gray-100">
-        <header className="text-center mb-6">
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-blue-600">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen flex flex-col">
+        <header className="text-center mb-8 pb-6 border-b border-gray-200">
+          <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-blue-600 tracking-tight">
             VishwaGuru
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-gray-500 font-medium mt-2">
             Empowering Citizens, Solving Problems.
           </p>
         </header>
+
+        <main className="flex-grow w-full max-w-5xl mx-auto bg-white shadow-xl rounded-2xl p-6 sm:p-8 border border-gray-100">
 
         {loading && (
           <div className="flex justify-center my-8">
@@ -214,7 +216,11 @@ function AppContent() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </main>
 
+        <footer className="mt-8 text-center text-gray-400 text-sm pb-8">
+            &copy; {new Date().getFullYear()} VishwaGuru. All rights reserved.
+        </footer>
       </div>
     </div>
   );
