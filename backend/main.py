@@ -25,7 +25,7 @@ from backend.cache import recent_issues_cache
 from backend.database import engine, Base, SessionLocal, get_db
 from backend.models import Issue
 from backend.schemas import IssueResponse, ChatRequest
-from backend.bot import run_bot
+from backend.bot import run_bot, start_bot_thread, stop_bot_thread
 from backend.ai_factory import create_all_ai_services
 from backend.ai_service import generate_action_plan, chat_with_civic_assistant
 from backend.maharashtra_locator import (
@@ -171,20 +171,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error pre-loading Maharashtra data: {e}")
 
-    # Startup: Start Telegram Bot in background (non-blocking)
-    bot_task = None
-    bot_app = None
-    
-    # Start bot initialization in background to avoid blocking port binding
-    async def start_bot_background():
-        nonlocal bot_app
-        try:
-            bot_app = await run_bot()
-        except Exception as e:
-            logger.error(f"Error starting bot: {e}")
-    
-    # Create background task for bot initialization
-    bot_task = asyncio.create_task(start_bot_background())
+    # Startup: Start Telegram Bot in separate thread (non-blocking for FastAPI)
+    try:
+        start_bot_thread()
+        logger.info("Telegram bot started in separate thread.")
+    except Exception as e:
+        logger.error(f"Error starting bot thread: {e}")
     
     yield
     
@@ -192,23 +184,12 @@ async def lifespan(app: FastAPI):
     await app.state.http_client.aclose()
     logger.info("Shared HTTP Client closed.")
 
-    # Shutdown: Stop Telegram Bot
-    if bot_task and not bot_task.done():
-        try:
-            bot_task.cancel()
-            await bot_task
-        except asyncio.CancelledError:
-            pass  # Expected when cancelling
-        except Exception as e:
-            logger.error(f"Error cancelling bot task: {e}")
-    
-    if bot_app:
-        try:
-            await bot_app.updater.stop()
-            await bot_app.stop()
-            await bot_app.shutdown()
-        except Exception as e:
-            logger.error(f"Error stopping bot: {e}")
+    # Shutdown: Stop Telegram Bot thread
+    try:
+        stop_bot_thread()
+        logger.info("Telegram bot thread stopped.")
+    except Exception as e:
+        logger.error(f"Error stopping bot thread: {e}")
 
 app = FastAPI(title="VishwaGuru Backend", lifespan=lifespan)
 
