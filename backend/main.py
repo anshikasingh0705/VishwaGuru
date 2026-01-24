@@ -133,11 +133,11 @@ async def validate_uploaded_file(file: UploadFile) -> None:
 # Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
-async def process_action_plan_background(issue_id: int, description: str, category: str, image_path: str):
+async def process_action_plan_background(issue_id: int, description: str, category: str, language: str, image_path: str):
     db = SessionLocal()
     try:
         # Generate Action Plan (AI)
-        action_plan = await generate_action_plan(description, category, image_path)
+        action_plan = await generate_action_plan(description, category, language, image_path)
 
         # Update issue in DB
         issue = db.query(Issue).filter(Issue.id == issue_id).first()
@@ -310,6 +310,7 @@ async def create_issue(
     background_tasks: BackgroundTasks,
     description: str = Form(..., min_length=10, max_length=1000),
     category: str = Form(..., pattern=f"^({'|'.join([cat.value for cat in IssueCategory])})$"),
+    language: str = Form('en'),
     user_email: str = Form(None),
     latitude: float = Form(None, ge=-90, le=90),
     longitude: float = Form(None, ge=-180, le=180),
@@ -370,7 +371,7 @@ async def create_issue(
         raise HTTPException(status_code=500, detail="Failed to save issue to database")
 
     # Add background task for AI generation
-    background_tasks.add_task(process_action_plan_background, new_issue.id, description, category, image_path)
+    background_tasks.add_task(process_action_plan_background, new_issue.id, description, category, language, image_path)
 
     # Optimistic Cache Update
     try:
