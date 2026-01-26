@@ -25,7 +25,7 @@ import httpx
 
 from backend.cache import recent_issues_cache, user_upload_cache
 from backend.database import engine, Base, SessionLocal, get_db
-from backend.models import Issue
+from backend.models import Issue, PushSubscription
 from backend.schemas import (
     IssueResponse, IssueSummaryResponse, IssueCreateRequest, IssueCreateResponse, ChatRequest, ChatResponse,
     VoteRequest, VoteResponse, DetectionResponse, UrgencyAnalysisRequest,
