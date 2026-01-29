@@ -131,8 +131,8 @@ graph TD
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| 🐍 **Python** | 3.8+ | Backend runtime |
-| ⚛️ **Node.js** | 18+ | Frontend build tools |
+| 🐍 **Python** | 3.12+ | Backend runtime |
+| ⚛️ **Node.js** | 20+ | Frontend build tools |
 | 📦 **npm** | Latest | Package management |
 | 🐙 **Git** | 2.0+ | Version control |
 
@@ -265,7 +265,7 @@ firebase deploy
 | Category | Technology | Purpose |
 |----------|------------|---------|
 | 🎨 **Frontend** | React 18, Vite, Tailwind CSS | Modern UI framework |
-| ⚙️ **Backend** | Python 3.8+, FastAPI, SQLAlchemy | API and business logic |
+| ⚙️ **Backend** | Python 3.12+, FastAPI, SQLAlchemy | API and business logic |
 | 🗄️ **Database** | SQLite (dev), PostgreSQL (prod) | Data persistence |
 | 🤖 **AI/ML** | Google Gemini API | Action plan generation |
 | 📱 **Bot** | python-telegram-bot | Alternative interface |
@@ -494,7 +494,7 @@ firebase deploy
 | Category | Technology | Purpose |
 |----------|------------|---------|
 | 🎨 **Frontend** | React 18, Vite, Tailwind CSS | Modern UI framework |
-| ⚙️ **Backend** | Python 3.8+, FastAPI, SQLAlchemy | API and business logic |
+| ⚙️ **Backend** | Python 3.12+, FastAPI, SQLAlchemy | API and business logic |
 | 🗄️ **Database** | SQLite (dev), PostgreSQL (prod) | Data persistence |
 | 🤖 **AI/ML** | Google Gemini API | Action plan generation |
 | 📱 **Bot** | python-telegram-bot | Alternative interface |
