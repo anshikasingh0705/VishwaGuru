@@ -14,10 +14,13 @@ def override_get_db():
     finally:
         pass
 
-app.dependency_overrides[get_db] = override_get_db
-
-# Mock http_client in app state
-app.state.http_client = MagicMock()
+@pytest.fixture(scope="module", autouse=True)
+def setup_overrides():
+    app.dependency_overrides[get_db] = override_get_db
+    # Mock http_client in app state
+    app.state.http_client = MagicMock()
+    yield
+    app.dependency_overrides = {}
 
 client = TestClient(app)
 
