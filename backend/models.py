@@ -120,7 +120,7 @@ class Issue(Base):
     verified_at = Column(DateTime, nullable=True)
     assigned_at = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, nullable=True)
-    user_email = Column(String, nullable=True)
+    user_email = Column(String, nullable=True, index=True)
     assigned_to = Column(String, nullable=True)  # Government official/department
     upvotes = Column(Integer, default=0, index=True)
     latitude = Column(Float, nullable=True, index=True)

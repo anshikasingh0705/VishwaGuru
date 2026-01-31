@@ -97,6 +97,14 @@ def migrate_db():
             except Exception:
                 pass
 
+            # Add index on user_email
+            try:
+                conn.execute(text("CREATE INDEX ix_issues_user_email ON issues (user_email)"))
+                logger.info("Migrated database: Added index on user_email column.")
+            except Exception:
+                # Index likely already exists
+                pass
+
             conn.commit()
             logger.info("Database migration check completed.")
     except Exception as e:
