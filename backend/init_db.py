@@ -75,6 +75,14 @@ def migrate_db():
                 # Index likely already exists
                 pass
 
+            # Add composite index for optimized spatial+status queries
+            try:
+                conn.execute(text("CREATE INDEX ix_issues_status_lat_lon ON issues (status, latitude, longitude)"))
+                logger.info("Migrated database: Added composite index on status, latitude, longitude.")
+            except Exception:
+                # Index likely already exists
+                pass
+
             # Add location column
             try:
                 conn.execute(text("ALTER TABLE issues ADD COLUMN location VARCHAR"))

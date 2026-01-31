@@ -30,7 +30,18 @@ def test_create_issue():
     try:
         from unittest.mock import patch, AsyncMock
         # Patch validation to avoid PIL/magic issues with dummy image
-        with patch("backend.main.validate_uploaded_file", new_callable=AsyncMock) as mock_validate:
+        # Also patch action plan generation to avoid external API calls
+        # Note: Patch where it is imported/used (backend.main), not where it is defined
+        with patch("backend.main.validate_uploaded_file", new_callable=AsyncMock) as mock_validate, \
+             patch("backend.main.generate_action_plan", new_callable=AsyncMock) as mock_plan:
+
+            mock_plan.return_value = {
+                "whatsapp": "Test WhatsApp",
+                "email_subject": "Test Subject",
+                "email_body": "Test Body",
+                "x_post": "Test X Post"
+            }
+
             with TestClient(app) as client:
                 with open(tmp_path, "rb") as f:
                     response = client.post(

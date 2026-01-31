@@ -1,5 +1,5 @@
 import json
-from sqlalchemy import Column, Integer, String, DateTime, Float, Text, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Float, Text, ForeignKey, Enum, Index
 from sqlalchemy.types import TypeDecorator
 from backend.database import Base
 from sqlalchemy.orm import relationship
@@ -105,6 +105,9 @@ class EscalationAudit(Base):
 
 class Issue(Base):
     __tablename__ = "issues"
+    __table_args__ = (
+        Index("ix_issues_status_lat_lon", "status", "latitude", "longitude"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     reference_id = Column(String, unique=True, index=True)  # Secure reference for government updates

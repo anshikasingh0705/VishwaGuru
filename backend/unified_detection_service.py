@@ -53,15 +53,22 @@ class UnifiedDetectionService:
             return self._local_available
         
         try:
-            from local_ml_service import get_local_model
-            model = get_local_model()
+            from local_ml_service import get_general_model
+            model = get_general_model()
             
-            # Try a simple classification to verify
+            # Check if model is loaded
+            if model is None:
+                self._local_available = False
+                return False
+
+            # Try a simple prediction to verify
+            # Run in threadpool as it might be blocking
+            from fastapi.concurrency import run_in_threadpool
             test_image = Image.new("RGB", (224, 224), color="white")
-            model.classify_image(test_image, ["test"], threshold=0.0)
+            await run_in_threadpool(model.predict, test_image, verbose=False)
             
-            self._local_available = model.is_available
-            return self._local_available
+            self._local_available = True
+            return True
             
         except Exception as e:
             logger.warning(f"Local ML service unavailable: {e}")
@@ -226,8 +233,8 @@ class UnifiedDetectionService:
         # Add local model details if available
         if local_available:
             try:
-                from local_ml_service import get_model_status
-                status["local_backend"]["details"] = get_model_status()
+                from local_ml_service import get_detection_status
+                status["local_backend"]["details"] = await get_detection_status()
             except Exception:
                 pass
         
