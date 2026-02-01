@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fakeActionPlan } from '../fakeData';
-import { Camera, Image as ImageIcon, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Camera, Image as ImageIcon, CheckCircle2, AlertTriangle, Loader2, Layers } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { saveReportOffline, registerBackgroundSync } from '../offlineQueue';
+import VoiceInput from '../components/VoiceInput';
+import { detectorsApi } from '../api';
 
 // Get API URL from environment variable, fallback to relative URL for local dev
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) => {
+  const { t, i18n } = useTranslation();
   const locationState = useLocation().state || {};
   const [formData, setFormData] = useState({
     description: locationState.description || '',
@@ -23,8 +27,14 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
   const [describing, setDescribing] = useState(false);
   const [urgencyAnalysis, setUrgencyAnalysis] = useState(null);
   const [analyzingUrgency, setAnalyzingUrgency] = useState(false);
+  const [depthMap, setDepthMap] = useState(null);
+  const [analyzingDepth, setAnalyzingDepth] = useState(false);
+  const [smartCategory, setSmartCategory] = useState(null);
+  const [analyzingSmartScan, setAnalyzingSmartScan] = useState(false);
   const [submitStatus, setSubmitStatus] = useState({ state: 'idle', message: '' });
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [uploading, setUploading] = useState(false);
+  const [analysisErrors, setAnalysisErrors] = useState({});
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -90,6 +100,7 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
     if (!file) return;
     setAnalyzing(true);
     setSeverity(null);
+    setAnalysisErrors(prev => ({ ...prev, severity: null }));
 
     const uploadData = new FormData();
     uploadData.append('image', file);
@@ -102,20 +113,151 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
         if (response.ok) {
             const data = await response.json();
             setSeverity(data);
+        } else {
+            const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            setAnalysisErrors(prev => ({ ...prev, severity: errorData.detail || 'Analysis failed' }));
         }
     } catch (e) {
         console.error("Severity analysis failed", e);
+        setAnalysisErrors(prev => ({ ...prev, severity: 'Network error - please try again' }));
     } finally {
         setAnalyzing(false);
     }
   };
 
-  const handleImageChange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-          setFormData({...formData, image: file});
-          analyzeImage(file);
+  const analyzeDepth = async () => {
+      if (!formData.image) return;
+      setAnalyzingDepth(true);
+      setDepthMap(null);
+
+      const uploadData = new FormData();
+      uploadData.append('image', formData.image);
+
+      try {
+          const data = await detectorsApi.depth(uploadData);
+          if (data && data.depth_map) {
+              setDepthMap(data.depth_map);
+          }
+      } catch (e) {
+          console.error("Depth analysis failed", e);
+      } finally {
+          setAnalyzingDepth(false);
       }
+  };
+
+  const mapSmartScanToCategory = (label) => {
+      const map = {
+          'pothole': 'road',
+          'garbage': 'garbage',
+          'flooded street': 'water',
+          'fire accident': 'road',
+          'fallen tree': 'road',
+          'stray animal': 'road',
+          'blocked road': 'road',
+          'broken streetlight': 'streetlight',
+          'illegal parking': 'road',
+          'graffiti vandalism': 'college_infra',
+          'normal street': 'road'
+      };
+      return map[label] || 'road';
+  };
+
+  const analyzeSmartScan = async (file) => {
+      if (!file) return;
+      setAnalyzingSmartScan(true);
+      setSmartCategory(null);
+      setAnalysisErrors(prev => ({ ...prev, smartScan: null }));
+
+      const uploadData = new FormData();
+      uploadData.append('image', file);
+
+      try {
+          const data = await detectorsApi.smartScan(uploadData);
+          if (data && data.category && data.category !== 'unknown') {
+              const mappedCategory = mapSmartScanToCategory(data.category);
+              setSmartCategory({
+                  original: data.category,
+                  mapped: mappedCategory,
+                  confidence: data.confidence
+              });
+          }
+      } catch (e) {
+          console.error("Smart scan failed", e);
+          setAnalysisErrors(prev => ({ ...prev, smartScan: 'Smart scan failed - continuing with manual selection' }));
+      } finally {
+          setAnalyzingSmartScan(false);
+      }
+  };
+
+  const compressImage = (file, maxWidth = 1024, maxHeight = 1024, quality = 0.8) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(resolve, 'image/jpeg', quality);
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setUploading(true);
+      try {
+        // Compress image if it's large
+        let processedFile = file;
+        if (file.size > 1024 * 1024) { // 1MB
+          const compressedBlob = await compressImage(file);
+          processedFile = new File([compressedBlob], file.name, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+        }
+
+        setFormData({...formData, image: processedFile});
+
+        // Analyze in parallel but with error handling
+        await Promise.allSettled([
+          analyzeImage(processedFile),
+          analyzeSmartScan(processedFile)
+        ]);
+      } catch (error) {
+        console.error('Image processing failed:', error);
+        // Fallback to original file
+        setFormData({...formData, image: file});
+        await Promise.allSettled([
+          analyzeImage(file),
+          analyzeSmartScan(file)
+        ]);
+      } finally {
+        setUploading(false);
+      }
+    }
   };
 
   const getLocation = () => {
@@ -181,6 +323,7 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
     const payload = new FormData();
     payload.append('description', formData.description);
     payload.append('category', formData.category);
+    payload.append('language', i18n.language);
     if (formData.latitude) payload.append('latitude', formData.latitude);
     if (formData.longitude) payload.append('longitude', formData.longitude);
     if (formData.location) payload.append('location', formData.location);
@@ -239,19 +382,69 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
               <option value="college_infra">College Infrastructure</option>
               <option value="women_safety">Women Safety</option>
             </select>
+            {analyzingSmartScan && (
+                <div className="text-xs text-blue-600 mt-1 animate-pulse flex items-center gap-1">
+                    <Loader2 size={12} className="animate-spin"/>
+                    AI is analyzing image for category...
+                </div>
+            )}
+            {analysisErrors.smartScan && (
+                <div className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={12} />
+                    {analysisErrors.smartScan}
+                </div>
+            )}
+            {smartCategory && (
+                <div
+                    onClick={() => setFormData({...formData, category: smartCategory.mapped})}
+                    className="mt-2 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 p-2 rounded-lg cursor-pointer hover:bg-purple-100 transition flex items-center justify-between group"
+                >
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">✨</span>
+                        <div>
+                            <p className="text-xs text-purple-800 font-bold uppercase tracking-wide">AI Suggestion</p>
+                            <p className="text-sm font-medium text-purple-900 capitalize">{smartCategory.original}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white text-purple-600 px-3 py-1 rounded text-xs font-bold shadow-sm group-hover:shadow transition">
+                        Apply
+                    </div>
+                </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Language</label>
+            <select
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"
+              value={i18n.language}
+              onChange={(e) => i18n.changeLanguage(e.target.value)}
+            >
+              <option value="en">English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="mr">मराठी (Marathi)</option>
+            </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
-            <textarea
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"
-              rows="3"
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-              onBlur={analyzeUrgency}
-              placeholder="Describe the issue..."
-            />
+            <div className="relative">
+              <textarea
+                required
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border pr-12"
+                rows="3"
+                value={formData.description}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onBlur={analyzeUrgency}
+                placeholder="Describe the issue..."
+              />
+              <div className="absolute top-2 right-2">
+                <VoiceInput
+                  onTranscript={(transcript) => setFormData(prev => ({...prev, description: prev.description + ' ' + transcript}))}
+                  language={i18n.language}
+                />
+              </div>
+            </div>
             {analyzingUrgency && (
                <div className="mt-1 text-xs text-blue-600 animate-pulse">
                    Checking urgency...
@@ -328,8 +521,44 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
             </div>
 
             {formData.image && (
-                <div className="text-sm text-green-600 mb-2 text-center">
-                    Selected: {formData.image.name}
+                <div className="text-sm text-green-600 mb-2 text-center flex items-center justify-center gap-2">
+                    {uploading ? (
+                        <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Processing image...
+                        </>
+                    ) : (
+                        <>Selected: {formData.image.name}</>
+                    )}
+                </div>
+            )}
+
+            {formData.image && !depthMap && (
+                <button
+                    type="button"
+                    onClick={analyzeDepth}
+                    disabled={analyzingDepth}
+                    className="w-full text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-2 rounded-lg hover:bg-indigo-100 transition flex items-center justify-center gap-2 font-medium mb-2"
+                >
+                    {analyzingDepth ? (
+                        <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <Layers size={14} />
+                    )}
+                    {analyzingDepth ? 'Generating 3D Map...' : 'Analyze Severity (3D)'}
+                </button>
+            )}
+
+            {depthMap && (
+                <div className="mb-2 border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-2 py-1 text-xs text-gray-500 font-medium border-b border-gray-200">
+                        3D Depth Analysis Map
+                    </div>
+                    <img
+                        src={`data:image/jpeg;base64,${depthMap}`}
+                        alt="Depth Map"
+                        className="w-full h-auto object-cover"
+                    />
                 </div>
             )}
 
@@ -337,6 +566,13 @@ const ReportForm = ({ setView, setLoading, setError, setActionPlan, loading }) =
                 <div className="flex items-center justify-center gap-2 text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-100 animate-pulse">
                     <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                     <span className="text-sm font-medium">Analyzing severity...</span>
+                </div>
+            )}
+
+            {analysisErrors.severity && (
+                <div className="flex items-center justify-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
+                    <AlertTriangle size={16} />
+                    <span className="text-sm font-medium">Severity analysis: {analysisErrors.severity}</span>
                 </div>
             )}
 

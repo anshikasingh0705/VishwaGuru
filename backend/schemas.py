@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, validator, field_validator
 from typing import List, Optional, Any, Dict, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 class IssueCategory(str, Enum):
@@ -37,7 +37,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str = Field(..., description="AI assistant's response")
 
-class IssueResponse(BaseModel):
+class IssueSummaryResponse(BaseModel):
     id: int = Field(..., description="Unique issue identifier")
     category: str = Field(..., description="Issue category")
     description: str = Field(..., description="Issue description")
@@ -48,9 +48,12 @@ class IssueResponse(BaseModel):
     location: Optional[str] = Field(None, description="Location description")
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Latitude coordinate")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Longitude coordinate")
-    action_plan: Optional[Dict[str, Any]] = Field(None, description="Generated action plan")
+    # action_plan excluded to optimize payload size
 
     model_config = ConfigDict(from_attributes=True)
+
+class IssueResponse(IssueSummaryResponse):
+    action_plan: Optional[Dict[str, Any]] = Field(None, description="Generated action plan")
 
 class IssueCreateRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=1000, description="Issue description")
@@ -103,7 +106,10 @@ class PushSubscriptionResponse(BaseModel):
     id: int = Field(..., description="Subscription ID")
     message: str = Field(..., description="Subscription confirmation")
 
-class DetectionRequest(BaseModel):
+class DetectionResponse(BaseModel):
+    detections: List[Dict[str, Any]] = Field(..., description="List of detected objects/items")
+
+class DetectionResponse(BaseModel):
     detections: List[Dict[str, Any]] = Field(..., description="List of detected objects/items")
 
 class UrgencyAnalysisRequest(BaseModel):
@@ -133,9 +139,87 @@ class ErrorResponse(BaseModel):
     error: str = Field(..., description="Error message")
     error_code: str = Field(..., description="Error code for client handling")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Error timestamp")
 
 class SuccessResponse(BaseModel):
     message: str = Field(..., description="Success message")
     data: Optional[Dict[str, Any]] = Field(None, description="Response data")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Response timestamp")
+
+
+class StatsResponse(BaseModel):
+    total_issues: int = Field(..., description="Total number of issues reported")
+    resolved_issues: int = Field(..., description="Number of resolved/verified issues")
+    pending_issues: int = Field(..., description="Number of open/assigned/in_progress issues")
+    issues_by_category: Dict[str, int] = Field(..., description="Count of issues by category")
+
+
+class NearbyIssueResponse(BaseModel):
+    id: int = Field(..., description="Issue ID")
+    description: str = Field(..., description="Issue description")
+    category: str = Field(..., description="Issue category")
+    latitude: float = Field(..., description="Issue latitude")
+    longitude: float = Field(..., description="Issue longitude")
+    distance_meters: float = Field(..., description="Distance from new issue location")
+    upvotes: int = Field(..., description="Number of upvotes")
+    created_at: datetime = Field(..., description="Issue creation timestamp")
+    status: str = Field(..., description="Issue status")
+
+
+class DeduplicationCheckResponse(BaseModel):
+    has_nearby_issues: bool = Field(..., description="Whether nearby issues were found")
+    nearby_issues: List[NearbyIssueResponse] = Field(default_factory=list, description="List of nearby issues")
+    recommended_action: str = Field(..., description="Recommended action: 'create_new', 'upvote_existing', 'verify_existing'")
+
+
+class IssueCreateWithDeduplicationResponse(BaseModel):
+    id: Optional[int] = Field(None, description="Created issue ID (None if deduplication occurred)")
+    message: str = Field(..., description="Response message")
+    action_plan: Optional[ActionPlan] = Field(None, description="Generated action plan")
+    deduplication_info: DeduplicationCheckResponse = Field(..., description="Deduplication check results")
+    linked_issue_id: Optional[int] = Field(None, description="ID of existing issue that was upvoted (if applicable)")
+
+
+class LeaderboardEntry(BaseModel):
+    user_email: str = Field(..., description="User email (masked)")
+    reports_count: int = Field(..., description="Number of issues reported")
+    total_upvotes: int = Field(..., description="Total upvotes received on reports")
+    rank: int = Field(..., description="Rank on the leaderboard")
+
+class LeaderboardResponse(BaseModel):
+    leaderboard: List[LeaderboardEntry] = Field(..., description="List of top reporters")
+
+
+# Escalation-related schemas
+class EscalationAuditResponse(BaseModel):
+    id: int = Field(..., description="Escalation audit record ID")
+    grievance_id: int = Field(..., description="Associated grievance ID")
+    previous_authority: str = Field(..., description="Previous authority handling the grievance")
+    new_authority: str = Field(..., description="New authority after escalation")
+    timestamp: datetime = Field(..., description="When the escalation occurred")
+    reason: str = Field(..., description="Reason for escalation (SLA_BREACH, SEVERITY_UPGRADE, MANUAL)")
+
+class GrievanceSummaryResponse(BaseModel):
+    id: int = Field(..., description="Grievance ID")
+    unique_id: str = Field(..., description="Unique grievance identifier")
+    category: str = Field(..., description="Issue category")
+    severity: str = Field(..., description="Severity level (LOW, MEDIUM, HIGH, CRITICAL)")
+    pincode: Optional[str] = Field(None, description="Pincode")
+    city: Optional[str] = Field(None, description="City")
+    district: Optional[str] = Field(None, description="District")
+    state: Optional[str] = Field(None, description="State")
+    current_jurisdiction_id: int = Field(..., description="Current jurisdiction ID")
+    assigned_authority: str = Field(..., description="Currently assigned authority")
+    sla_deadline: datetime = Field(..., description="SLA deadline")
+    status: str = Field(..., description="Current status")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    resolved_at: Optional[datetime] = Field(None, description="Resolution timestamp")
+    escalation_history: List[EscalationAuditResponse] = Field(default_factory=list, description="Escalation history")
+
+class EscalationStatsResponse(BaseModel):
+    total_grievances: int = Field(..., description="Total number of grievances")
+    escalated_grievances: int = Field(..., description="Number of escalated grievances")
+    active_grievances: int = Field(..., description="Number of active grievances")
+    resolved_grievances: int = Field(..., description="Number of resolved grievances")
+    escalation_rate: float = Field(..., description="Percentage of grievances that were escalated")

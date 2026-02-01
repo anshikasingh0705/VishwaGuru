@@ -13,13 +13,25 @@ token = os.environ.get("HF_TOKEN")
 headers = {"Authorization": f"Bearer {token}"} if token else {}
 
 # Zero-Shot Image Classification Model
-CLIP_API_URL = "https://api-inference.huggingface.co/models/openai/clip-vit-base-patch32"
+CLIP_API_URL = "https://router.huggingface.co/models/openai/clip-vit-base-patch32"
 
 # Image Captioning Model
-CAPTION_API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
+CAPTION_API_URL = "https://router.huggingface.co/models/Salesforce/blip-image-captioning-large"
 
 # Sentiment Analysis / Text Classification Model
-SENTIMENT_API_URL = "https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest"
+SENTIMENT_API_URL = "https://router.huggingface.co/models/cardiffnlp/twitter-roberta-base-sentiment-latest"
+
+# Visual Question Answering Model
+VQA_API_URL = "https://router.huggingface.co/models/dandelin/vilt-b32-finetuned-vqa"
+
+# Depth Estimation Model
+DEPTH_API_URL = "https://router.huggingface.co/models/Intel/dpt-hybrid-midas"
+
+# Audio Classification Model
+AUDIO_CLASS_API_URL = "https://router.huggingface.co/models/MIT/ast-finetuned-audioset-10-10-0.4593"
+
+# Speech-to-Text Model (Whisper)
+WHISPER_API_URL = "https://router.huggingface.co/models/openai/whisper-large-v3-turbo"
 
 async def _make_request(client, url, payload):
     try:
@@ -113,6 +125,49 @@ async def detect_pest_clip(image: Union[Image.Image, bytes], client: httpx.Async
     labels = ["rat", "cockroach", "mosquito swarm", "pest infestation", "clean", "no pests"]
     targets = ["rat", "cockroach", "mosquito swarm", "pest infestation"]
     return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_water_leak_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["water leak", "burst pipe", "flooded floor", "puddle", "dry floor", "no water"]
+    targets = ["water leak", "burst pipe", "flooded floor", "puddle"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_accessibility_issue_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["blocked wheelchair ramp", "stairs without ramp", "broken ramp", "accessible path", "wheelchair accessible", "clear path"]
+    targets = ["blocked wheelchair ramp", "stairs without ramp", "broken ramp"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_crowd_density_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    labels = ["dense crowd", "dangerous overcrowding", "sparse crowd", "empty space", "safe crowd level"]
+    # We want to detect high density
+    targets = ["dense crowd", "dangerous overcrowding"]
+    return await _detect_clip_generic(image, labels, targets, client)
+
+async def detect_audio_event(audio_bytes: bytes, client: httpx.AsyncClient = None):
+    """
+    Detects audio events from audio bytes using MIT/ast-finetuned-audioset-10-10-0.4593.
+    """
+    # The Audio Classification API accepts raw audio bytes
+    try:
+        headers_bin = {"Authorization": f"Bearer {token}"} if token else {}
+        async def do_post(c):
+             return await c.post(AUDIO_CLASS_API_URL, headers=headers_bin, content=audio_bytes, timeout=30.0)
+
+        if client:
+            response = await do_post(client)
+        else:
+            async with httpx.AsyncClient() as new_client:
+                response = await do_post(new_client)
+
+        if response.status_code == 200:
+            # Result is usually [{"score": 0.9, "label": "speech"}, ...]
+            data = response.json()
+            return data
+        else:
+            logger.error(f"Audio API Error: {response.status_code} - {response.text}")
+            return []
+    except Exception as e:
+        logger.error(f"Audio Detection Error: {e}")
+        return []
 
 async def detect_severity_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
     """
@@ -229,3 +284,151 @@ async def analyze_urgency_text(text: str, client: httpx.AsyncClient = None):
             return {"urgency": urgency, "score": score, "sentiment": label}
 
     return {"urgency": "Low", "score": 0, "sentiment": "unknown"}
+
+
+async def verify_resolution_vqa(image: Union[Image.Image, bytes], question: str, client: httpx.AsyncClient = None):
+    """
+    Uses VQA to verify if an issue is resolved based on a question.
+    """
+    img_bytes = _prepare_image_bytes(image)
+    image_base64 = base64.b64encode(img_bytes).decode('utf-8')
+
+    payload = {
+        "inputs": {
+            "image": image_base64,
+            "question": question
+        }
+    }
+
+    if client:
+        result = await _make_request(client, VQA_API_URL, payload)
+    else:
+        async with httpx.AsyncClient() as new_client:
+            result = await _make_request(new_client, VQA_API_URL, payload)
+
+    # Result format: [{'answer': 'yes', 'score': 0.9}, ...]
+    if isinstance(result, list) and len(result) > 0:
+        top = result[0]
+        return {
+            "answer": top.get('answer'),
+            "confidence": top.get('score'),
+            "all_answers": result[:3]
+        }
+
+    return {"answer": "unknown", "confidence": 0}
+
+async def detect_depth_map(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    """
+    Generates a depth map for the given image using Intel/dpt-hybrid-midas.
+    Returns a Base64 encoded string of the depth map image.
+    """
+    img_bytes = _prepare_image_bytes(image)
+
+    # The DPT model expects raw image bytes as input and returns raw image bytes (JPEG/PNG)
+    try:
+        headers_bin = {"Authorization": f"Bearer {token}"} if token else {}
+        async def do_post(c):
+             return await c.post(DEPTH_API_URL, headers=headers_bin, content=img_bytes, timeout=30.0)
+
+        if client:
+            response = await do_post(client)
+        else:
+            async with httpx.AsyncClient() as new_client:
+                response = await do_post(new_client)
+
+        if response.status_code == 200:
+            # Response is a binary image
+            response_bytes = response.content
+            # Convert to base64
+            b64_img = base64.b64encode(response_bytes).decode('utf-8')
+            return {"depth_map": b64_img}
+        else:
+            logger.error(f"Depth API Error: {response.status_code} - {response.text}")
+            return {"error": "Failed to generate depth map", "details": response.text}
+
+    except Exception as e:
+        logger.error(f"Depth Estimation Error: {e}")
+        return {"error": str(e)}
+
+async def transcribe_audio(audio_bytes: bytes, client: httpx.AsyncClient = None):
+    """
+    Transcribes audio using OpenAI Whisper model via HF API.
+    """
+    try:
+        headers_bin = {"Authorization": f"Bearer {token}"} if token else {}
+        async def do_post(c):
+             return await c.post(WHISPER_API_URL, headers=headers_bin, content=audio_bytes, timeout=60.0)
+
+        if client:
+            response = await do_post(client)
+        else:
+            async with httpx.AsyncClient() as new_client:
+                response = await do_post(new_client)
+
+        if response.status_code == 200:
+            # Result: {"text": "..."}
+            data = response.json()
+            return data.get("text", "")
+        else:
+            logger.error(f"Whisper API Error: {response.status_code} - {response.text}")
+            return ""
+    except Exception as e:
+        logger.error(f"Audio Transcription Error: {e}")
+        return ""
+
+async def detect_waste_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    """
+    Classifies waste type for sorting.
+    """
+    labels = ["plastic bottle", "glass bottle", "metal can", "paper cardboard", "organic food waste", "electronic waste", "general trash"]
+
+    img_bytes = _prepare_image_bytes(image)
+    results = await query_hf_api(img_bytes, labels, client=client)
+
+    if isinstance(results, list) and len(results) > 0:
+        top = results[0]
+        return {
+            "waste_type": top.get('label'),
+            "confidence": top.get('score'),
+            "all_scores": results[:3]
+        }
+    return {"waste_type": "unknown", "confidence": 0}
+
+async def detect_civic_eye_clip(image: Union[Image.Image, bytes], client: httpx.AsyncClient = None):
+    """
+    Performs a comprehensive assessment of the scene.
+    """
+    # 1. Safety
+    safety_labels = ["safe area", "unsafe area", "dangerous situation", "secure environment"]
+
+    # 2. Cleanliness
+    clean_labels = ["clean street", "dirty street", "garbage piled up", "spotless area"]
+
+    # 3. Infrastructure
+    infra_labels = ["good infrastructure", "broken infrastructure", "potholes", "well maintained road"]
+
+    img_bytes = _prepare_image_bytes(image)
+
+    # We can do 3 separate calls or 1 big call. CLIP handles many labels well.
+    all_labels = safety_labels + clean_labels + infra_labels
+
+    results = await query_hf_api(img_bytes, all_labels, client=client)
+
+    if not isinstance(results, list):
+        return {"error": "Analysis failed"}
+
+    def get_top_category(res_list, category_labels):
+        relevant = [r for r in res_list if r.get('label') in category_labels]
+        if relevant:
+            return relevant[0]
+        return {"label": "unknown", "score": 0}
+
+    safety = get_top_category(results, safety_labels)
+    cleanliness = get_top_category(results, clean_labels)
+    infra = get_top_category(results, infra_labels)
+
+    return {
+        "safety": {"status": safety['label'], "score": safety['score']},
+        "cleanliness": {"status": cleanliness['label'], "score": cleanliness['score']},
+        "infrastructure": {"status": infra['label'], "score": infra['score']}
+    }
