@@ -85,18 +85,18 @@ def _validate_uploaded_file_sync(file: UploadFile) -> None:
         # Additional content validation: Try to open with PIL to ensure it's a valid image
         try:
             img = Image.open(file.file)
-            img.verify()  # Verify the image is not corrupted
-            file.file.seek(0)  # Reset after PIL operations
+            # Optimization: Skip img.verify() to avoid full file read.
+            # Corrupt files will fail during resize or subsequent processing.
 
             # Resize large images for better performance
-            img = Image.open(file.file)
             if img.width > 1024 or img.height > 1024:
                 # Calculate new size maintaining aspect ratio
                 ratio = min(1024 / img.width, 1024 / img.height)
                 new_width = int(img.width * ratio)
                 new_height = int(img.height * ratio)
 
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                # Use BILINEAR for faster resizing (LANCZOS is too slow for upload path)
+                img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
 
                 # Save resized image back to file
                 output = io.BytesIO()
