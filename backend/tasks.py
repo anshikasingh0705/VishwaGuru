@@ -63,6 +63,7 @@ async def create_grievance_from_issue_background(issue_id: int):
 
         # Create grievance data
         grievance_data = {
+            'issue_id': issue.id,
             'category': issue.category,
             'severity': severity,
             'pincode': None,  # Will be determined by routing service

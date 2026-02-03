@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Q
 from fastapi.responses import JSONResponse
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, defer
+from sqlalchemy import func
 from typing import List, Union, Dict, Any
 import uuid
 import os
@@ -129,7 +130,8 @@ async def create_issue(
 
                 # Automatically upvote the closest issue and link this report to it
                 closest_issue, _ = nearby_issues_with_distance[0]
-                closest_issue.upvotes = (closest_issue.upvotes or 0) + 1
+                # Atomic update for upvotes to prevent race conditions using coalesce for safety
+                closest_issue.upvotes = func.coalesce(Issue.upvotes, 0) + 1
                 linked_issue_id = closest_issue.id
 
                 # Update the database with the upvote

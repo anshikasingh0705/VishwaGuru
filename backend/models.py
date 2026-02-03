@@ -82,6 +82,7 @@ class Grievance(Base):
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), index=True)
     updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
     resolved_at = Column(DateTime, nullable=True)
+    issue_id = Column(Integer, nullable=True, index=True)
 
     # Relationships
     jurisdiction = relationship("Jurisdiction", back_populates="grievances")
