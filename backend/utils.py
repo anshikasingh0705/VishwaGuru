@@ -130,16 +130,12 @@ async def validate_uploaded_file(file: UploadFile) -> None:
     """
     await run_in_threadpool(_validate_uploaded_file_sync, file)
 
-def _process_uploaded_image_sync(
-    file: UploadFile,
-    save_path: Optional[str] = None,
-    max_dim: int = 1024,
-    strip_exif: bool = True
-) -> tuple[Image.Image, bytes]:
+def process_uploaded_image_sync(file: UploadFile) -> io.BytesIO:
     """
-    Synchronous implementation of unified image processing.
+    Synchronously validate, resize, and strip EXIF from uploaded image.
+    Returns the processed image data as BytesIO.
     """
-    # 1. Basic Size Check
+    # Check file size
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
@@ -150,78 +146,61 @@ def _process_uploaded_image_sync(
             detail=f"File too large. Maximum size allowed is {MAX_FILE_SIZE // (1024*1024)}MB"
         )
 
-    # 2. MIME Type Validation
+    # Check MIME type
     try:
         file_content = file.file.read(1024)
         file.file.seek(0)
         detected_mime = magic.from_buffer(file_content, mime=True)
+
         if detected_mime not in ALLOWED_MIME_TYPES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid file type. Detected: {detected_mime}"
+                detail=f"Invalid file type. Only image files are allowed. Detected: {detected_mime}"
             )
+
+        try:
+            img = Image.open(file.file)
+
+            # Resize if needed
+            if img.width > 1024 or img.height > 1024:
+                ratio = min(1024 / img.width, 1024 / img.height)
+                new_width = int(img.width * ratio)
+                new_height = int(img.height * ratio)
+                img = img.resize((new_width, new_height), Image.Resampling.BILINEAR)
+
+            # Strip EXIF
+            img_no_exif = Image.new(img.mode, img.size)
+            img_no_exif.paste(img)
+
+            # Save to BytesIO
+            output = io.BytesIO()
+            # Preserve format or default to JPEG
+            fmt = img.format or 'JPEG'
+            img_no_exif.save(output, format=fmt, quality=85)
+            output.seek(0)
+
+            return output
+
+        except Exception as pil_error:
+            logger.error(f"PIL processing failed: {pil_error}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image file."
+            )
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"MIME detection failed: {e}")
-        raise HTTPException(status_code=400, detail="Unable to validate file type")
+        logger.error(f"Error processing file: {e}")
+        raise HTTPException(status_code=400, detail="Unable to process file.")
 
-    # 3. Process with PIL
-    try:
-        img = Image.open(file.file)
-        original_format = img.format
-        # Force load to check integrity
-        img.load()
+async def process_uploaded_image(file: UploadFile) -> io.BytesIO:
+    return await run_in_threadpool(process_uploaded_image_sync, file)
 
-        # 4. Resize if needed
-        if img.width > max_dim or img.height > max_dim:
-            ratio = min(max_dim / img.width, max_dim / img.height)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.BILINEAR)
-
-        # 5. Strip EXIF / Clean metadata
-        if strip_exif:
-            # Create a new image with same mode and size but no metadata
-            clean_img = Image.new(img.mode, img.size)
-            clean_img.paste(img)
-            img = clean_img
-
-        # 6. Update file.file with optimized bytes for subsequent reads (e.g. for CLIP)
-        # This is critical so that the rest of the app uses the optimized image
-        output = io.BytesIO()
-        img.save(output, format=original_format or 'JPEG', quality=85)
-        optimized_bytes = output.getvalue()
-        file.size = len(optimized_bytes)
-        output.seek(0)
-        file.file = output
-
-        # 7. Save to disk if path provided
-        if save_path:
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            with open(save_path, "wb") as f:
-                f.write(optimized_bytes)
-            logger.info(f"Saved optimized image to {save_path}")
-
-        return img, optimized_bytes
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Image processing failed: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Invalid or corrupted image file")
-
-async def process_uploaded_image(
-    file: UploadFile,
-    save_path: Optional[str] = None,
-    max_dim: int = 1024,
-    strip_exif: bool = True
-) -> tuple[Image.Image, bytes]:
-    """
-    Unified image processing: Validation, Resizing, and EXIF stripping in one pass.
-    Minimizes Decode-Process-Encode cycles for better performance.
-    """
-    return await run_in_threadpool(
-        _process_uploaded_image_sync, file, save_path, max_dim, strip_exif
-    )
+def save_processed_image(file_obj: io.BytesIO, path: str):
+    """Save processed BytesIO to disk."""
+    with open(path, "wb") as buffer:
+        shutil.copyfileobj(file_obj, buffer)
 
 async def process_and_detect(image: UploadFile, detection_func) -> DetectionResponse:
     """
