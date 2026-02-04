@@ -213,11 +213,12 @@ def save_processed_image(file_obj: io.BytesIO, path: str):
 async def process_and_detect(image: UploadFile, detection_func) -> DetectionResponse:
     """
     Helper to process uploaded image and run detection.
+    Uses the optimized image processing pipeline.
     """
     # Validate uploaded file
     pil_image = await validate_uploaded_file(image)
 
-    # Convert to PIL Image directly from file object to save memory
+    # Validate image for processing (check integrity)
     try:
         if pil_image is None:
             pil_image = await run_in_threadpool(Image.open, image.file)
